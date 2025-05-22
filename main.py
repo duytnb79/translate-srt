@@ -143,6 +143,7 @@ def translate_single_batch(batch_content: list[str], model: str, context_summary
         "Hãy đảm bảo bản dịch truyền tải đúng ý nghĩa, sắc thái của lời thoại gốc và phù hợp để hiển thị dưới dạng phụ đề. "
         "QUAN TRỌNG: Nếu phát hiện tên riêng của nhân vật (ví dụ: John, Mary, Dr. Smith), hãy phiên âm chúng sang tiếng Việt một cách tự nhiên và thông dụng (ví dụ: Giôn, Mê-ri, Bác sĩ Smít). "
         "Hãy nhất quán với cách phiên âm tên trong toàn bộ bản dịch. "
+        "ĐẶC BIỆT QUAN TRỌNG: Hãy tham khảo kỹ danh sách nhân vật và danh xưng được cung cấp trong phần TÓM TẮT KỊCH BẢN dưới đây và sử dụng chúng một cách nhất quán khi dịch. "
         "Sử dụng tóm tắt kịch bản dưới đây để hiểu rõ hơn về bối cảnh tổng thể:\n\n"
         f"TÓM TẮT KỊCH BẢN:\n'''{context_summary}'''\n\n"
         "Chỉ trả lời bằng một đối tượng JSON hợp lệ theo yêu cầu." 
@@ -285,7 +286,7 @@ if __name__ == "__main__":
     # SUMMARIES_DIRECTORY is defined globally
     TRANSLATION_MODEL_NAME = "gpt-4o-mini"
     SUMMARIZATION_MODEL_NAME = "gpt-4o-mini" 
-    BATCH_SIZE = 15
+    BATCH_SIZE = 20
     RUN_UUID = str(uuid.uuid4())
 
     # Ensure output and summaries directories exist
