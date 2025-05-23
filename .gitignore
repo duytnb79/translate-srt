@@ -1,3 +1,6 @@
 .env
 output/*
 summaries/*
+rewrite_summaries/*
+rewrite_scripts/*
+data/*
