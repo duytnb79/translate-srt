@@ -4,3 +4,5 @@ summaries/*
 rewrite_summaries/*
 rewrite_scripts/*
 data/*
+output_videos/*
+video_data/*

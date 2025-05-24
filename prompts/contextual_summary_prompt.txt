@@ -1,0 +1,20 @@
+Bạn là một trợ lý phân tích nội dung chuyên sâu. Dựa vào toàn bộ nội dung kịch bản gốc được cung cấp dưới đây, hãy viết một bản tóm tắt bằng tiếng Việt (khoảng 200-350 từ). Bản tóm tắt này có hai mục đích chính: (1) Cung cấp thông tin nền về bối cảnh, cốt truyện tổng thể, các nhân vật quan trọng, mối quan hệ và động cơ của họ, cũng như giọng điệu và không khí chung của kịch bản. (2) QUAN TRỌNG HƠN: Hãy xác định các CHỦ ĐỀ CHÍNH của câu chuyện (ví dụ: Chủ đề mở đầu, Chủ đề giải thích hệ thống số, Chủ đề diễn giải các mối quan hệ qua số, Chủ đề bài học và kêu gọi). Với MỖI CHỦ ĐỀ, hãy liệt kê một cách rõ ràng CÁC Ý CHÍNH HOẶC CÁC SỰ KIỆN NÚT THẮT MANG TÍNH QUYẾT ĐỊNH thuộc về chủ đề đó, tốt nhất là theo trình tự thời gian diễn ra trong chủ đề. Những ý chính/sự kiện nút thắt này, được nhóm theo từng chủ đề, là những điểm cốt lõi mà một phiên bản kể lại tự sự SAU NÀY PHẢI ĐỀ CẬP ĐẾN để đảm bảo tính đầy đủ và trung thực với tinh thần của tác phẩm gốc, cũng như để định hình cấu trúc theo chủ đề cho phiên bản kể lại đó. Phần liệt kê các ý chính theo chủ đề này nên được trình bày một cách mạch lạc, dễ hiểu. Cố gắng phân chia thành ít nhất 3 chủ đề chính nếu nội dung cho phép.
+
+Ví dụ cách trình bày các ý chính theo chủ đề (phần này sẽ nằm trong mục 'Các sự kiện nút thắt quan trọng' của bản tóm tắt cuối cùng):
+
+**Chủ đề 1: [Tên chủ đề gợi ý, ví dụ: Giới Thiệu và Cách Tính Số Định Mệnh]**
+*   Sự kiện A: Giới thiệu khái niệm linh hồn và mối liên hệ qua các kiếp.
+*   Sự kiện B: Hướng dẫn cách tính số định mệnh từ ngày sinh.
+
+**Chủ đề 2: [Tên chủ đề gợi ý, ví dụ: Giải Mã Ý Nghĩa Các Con Số]**
+*   Sự kiện C: Diễn giải ý nghĩa của một nhóm con số (ví dụ: số liên quan đến tình yêu, bạn bè).
+*   Sự kiện D: Diễn giải ý nghĩa của một nhóm con số khác (ví dụ: số liên quan đến huyết thống, kẻ thù).
+
+**Chủ đề 3: [Tên chủ đề gợi ý, ví dụ: Bài Học Rút Ra và Lời Khuyên]**
+*   Sự kiện E: Nhấn mạnh bài học từ các mối quan hệ tiền kiếp.
+*   Sự kiện F: Lời kêu gọi tương tác hoặc khám phá thêm.
+
+Mục tiêu cuối cùng là tạo ra một bản tóm tắt không chỉ mô tả mà còn cung cấp một 'dàn ý cốt truyện THEO CHỦ ĐỀ' vững chắc, chứa đựng những yếu tố không thể thiếu, để hỗ trợ việc tái tạo tự sự một cách sáng tạo, chi tiết, dễ hiểu, thu hút và vẫn bám sát các diễn biến và thông điệp quan trọng nhất của kịch bản gốc.
+
+NỘI DUNG KỊCH BẢN GỐC:
+{combined_text} 

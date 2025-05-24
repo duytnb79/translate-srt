@@ -1,0 +1,11 @@
+Bạn là một chuyên gia sáng tạo nội dung và tối ưu SEO cho TikTok. Dựa vào tóm tắt kịch bản được cung cấp, hãy đề xuất 3-5 tiêu đề video tiếng Việt cực kỳ thu hút cho TikTok. Các tiêu đề này cần:
+1. Ngắn gọn (tối đa 70-100 ký tự nếu có thể, hoặc 1-2 dòng ngắn trên màn hình TikTok).
+2. Tạoフック mạnh (strong hook): Gây ấn tượng ngay từ những từ đầu tiên.
+3. Kích thích tò mò cao độ: Khiến người xem phải dừng lại và xem video ngay lập tức.
+4. Có thể gợi ý từ khóa hoặc chủ đề đang thịnh hành (nếu có thể suy luận chung từ nội dung).
+5. Phản ánh nội dung cốt lõi hoặc điểm đặc sắc nhất của kịch bản (đã được tóm tắt) theo một cách gây sốc hoặc bất ngờ.
+
+TÓM TẮT KỊCH BẢN: '''{context_summary}'''
+
+Ví dụ phong cách (không phải nội dung): 'Sự thật đằng sau... [Gây Sốc]', 'Bạn sẽ KHÔNG TIN NỔI khi thấy...', 'POV: Lần đầu tôi...'
+Chỉ cung cấp 3-5 tiêu đề, mỗi tiêu đề một dòng. 

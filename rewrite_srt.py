@@ -11,6 +11,28 @@ load_dotenv()
 # Initialize the OpenAI client
 client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+# --- Constants for Prompt Files ---
+PROMPTS_DIR = "prompts"
+PERSONAS_SUB_DIR = "personas" # New constant for personas subdirectory
+
+# --- Helper Function to Load Prompts ---
+def load_prompt(file_name: str, persona_name: str | None = None) -> str:
+    """Loads a prompt from the specified file in the PROMPTS_DIR or a persona-specific subdirectory."""
+    if persona_name:
+        file_path = os.path.join(PROMPTS_DIR, PERSONAS_SUB_DIR, persona_name, file_name)
+    else:
+        file_path = os.path.join(PROMPTS_DIR, file_name)
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"LỖI: Không tìm thấy file prompt: {file_path}. Trả về chuỗi trống.")
+        return ""
+    except Exception as e:
+        print(f"Lỗi khi đọc file prompt {file_path}: {e}. Trả về chuỗi trống.")
+        return ""
+
 # --- Configuration ---
 MODEL_PRICING = {
     # Prices per 1K tokens
@@ -82,27 +104,18 @@ def generate_contextual_summary(srt_blocks: list[str], model: str) -> tuple[str,
 
     combined_text = "\n---".join(full_text_for_summary) # Removed extra newline
 
-    summary_prompt = (
-        "Bạn là một trợ lý phân tích nội dung chuyên sâu. Dựa vào toàn bộ nội dung kịch bản gốc được cung cấp dưới đây, "
-        "hãy viết một bản tóm tắt bằng tiếng Việt (khoảng 200-350 từ). "
-        "Bản tóm tắt này có hai mục đích chính: (1) Cung cấp thông tin nền về bối cảnh, cốt truyện tổng thể, các nhân vật quan trọng, mối quan hệ và động cơ của họ, cũng như giọng điệu và không khí chung của kịch bản. (2) QUAN TRỌNG HƠN: Xác định và liệt kê một cách rõ ràng CÁC Ý CHÍNH HOẶC CÁC SỰ KIỆN NÚT THẮT MANG TÍNH QUYẾT ĐỊNH của câu chuyện, tốt nhất là theo trình tự thời gian diễn ra. "
-        "Những ý chính/sự kiện nút thắt này là những điểm cốt lõi mà một phiên bản kể lại tự sự SAU NÀY PHẢI ĐỀ CẬP ĐẾN để đảm bảo tính đầy đủ và trung thực với tinh thần của tác phẩm gốc. "
-        "Phần liệt kê các ý chính này nên được trình bày một cách mạch lạc, dễ hiểu, có thể ở dạng gạch đầu dòng hoặc một đoạn văn riêng biệt nêu bật các điểm này một cách cô đọng. "
-        "Ví dụ cách trình bày các ý chính (nếu dùng gạch đầu dòng): \n"
-        "- Sự kiện A mở đầu câu chuyện, giới thiệu nhân vật X.\n"
-        "- Xung đột chính nảy sinh khi Y xuất hiện.\n"
-        "- Nhân vật X đưa ra quyết định quan trọng Z.\n"
-        "- Cao trào của câu chuyện là sự kiện K.\n"
-        "- Câu chuyện kết thúc với hậu quả M và bài học N.\n"
-        "Mục tiêu cuối cùng là tạo ra một bản tóm tắt không chỉ mô tả mà còn cung cấp một 'dàn ý cốt truyện' vững chắc, chứa đựng những yếu tố không thể thiếu, để hỗ trợ việc tái tạo tự sự một cách sáng tạo nhưng vẫn bám sát các diễn biến và thông điệp quan trọng nhất của kịch bản gốc.\n\nNỘI DUNG KỊCH BẢN GỐC:\n"
-        f"{combined_text}"
-    )
+    base_summary_prompt_template = load_prompt("contextual_summary_prompt.txt")
+    if not base_summary_prompt_template:
+        print("LỖI: Không thể tải mẫu prompt tóm tắt. Bỏ qua tạo tóm tắt.")
+        return "", 0, 0
+    
+    summary_prompt = base_summary_prompt_template.format(combined_text=combined_text)
 
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "Bạn là trợ lý phân tích nội dung chuyên nghiệp, có khả năng nắm bắt các yếu tố quan trọng của kịch bản để hỗ trợ việc viết lại. Chỉ cung cấp tóm tắt bằng tiếng Việt."},
+                {"role": "system", "content": "Bạn là một trợ lý phân tích nội dung chuyên nghiệp, có khả năng nắm bắt các yếu tố quan trọng của kịch bản để hỗ trợ việc viết lại. Chỉ cung cấp tóm tắt bằng tiếng Việt."},
                 {"role": "user", "content": summary_prompt}
             ],
             temperature=0.5,
@@ -204,19 +217,14 @@ def generate_creative_titles_for_rewrite(context_summary: str, model: str) -> tu
     """Generates creative titles for rewriting context, optimized for TikTok SEO."""
     print(f"\nĐang tạo tiêu đề sáng tạo (TikTok SEO, viết lại) với model: {model}...")
     if not context_summary: return [], 0, 0
-    prompt = (
-        "Bạn là một chuyên gia sáng tạo nội dung và tối ưu SEO cho TikTok. "
-        "Dựa vào tóm tắt kịch bản được cung cấp, hãy đề xuất 3-5 tiêu đề video tiếng Việt cực kỳ thu hút cho TikTok. "
-        "Các tiêu đề này cần:\n"
-        "1. Ngắn gọn (tối đa 70-100 ký tự nếu có thể, hoặc 1-2 dòng ngắn trên màn hình TikTok).\n"
-        "2. Tạoフック mạnh (strong hook): Gây ấn tượng ngay từ những từ đầu tiên.\n"
-        "3. Kích thích tò mò cao độ: Khiến người xem phải dừng lại và xem video ngay lập tức.\n"
-        "4. Có thể gợi ý từ khóa hoặc chủ đề đang thịnh hành (nếu có thể suy luận chung từ nội dung).\n"
-        "5. Phản ánh nội dung cốt lõi hoặc điểm đặc sắc nhất của kịch bản (đã được tóm tắt) theo một cách gây sốc hoặc bất ngờ.\n\n"
-        f"TÓM TẮT KỊCH BẢN: '''{context_summary}'''\n\n"
-        "Ví dụ phong cách (không phải nội dung): 'Sự thật đằng sau... [Gây Sốc]', 'Bạn sẽ KHÔNG TIN NỔI khi thấy...', 'POV: Lần đầu tôi...'\n"
-        "Chỉ cung cấp 3-5 tiêu đề, mỗi tiêu đề một dòng."
-    )
+    
+    base_titles_prompt_template = load_prompt("creative_titles_prompt.txt")
+    if not base_titles_prompt_template:
+        print("LỖI: Không thể tải mẫu prompt tiêu đề. Bỏ qua tạo tiêu đề.")
+        return [], 0, 0
+
+    prompt = base_titles_prompt_template.format(context_summary=context_summary)
+
     try:
         response = client.chat.completions.create(
             model=model, messages=[{"role": "system", "content": "Chuyên gia sáng tạo tiêu đề video TikTok tiếng Việt, ưu tiên sự ngắn gọn, gây sốc và tò mò."}, {"role": "user", "content": prompt}],
@@ -232,18 +240,14 @@ def generate_engaging_description_for_rewrite(context_summary: str, model: str) 
     """Generates an engaging description for rewriting context, optimized for TikTok SEO."""
     print(f"Đang tạo mô tả hấp dẫn (TikTok SEO, viết lại) với model: {model}...")
     if not context_summary: return "", 0, 0
-    prompt = (
-        "Bạn là một chuyên gia sáng tạo nội dung và copywriter cho TikTok. "
-        "Dựa vào tóm tắt kịch bản được cung cấp, hãy viết một mô tả (caption) video TikTok bằng tiếng Việt siêu ngắn (tối đa 1-3 câu, khoảng 100-220 ký tự). "
-        "Mô tả này cần:\n"
-        "1. Có MÓC CÂU CỰC MẠNH ở ngay đầu.\n"
-        "2. Tạo sự tò mò hoặc đặt câu hỏi để khuyến khích tương tác (bình luận, xem hết video).\n"
-        "3. Liên quan trực tiếp đến điểm hấp dẫn nhất của video (dựa trên tóm tắt).\n"
-        "4. Có thể bao gồm 2-3 hashtag gợi ý chung chung liên quan đến chủ đề (ví dụ: #learnontiktok #bian #khampha #kechuyen). Tránh hashtag quá cụ thể hoặc trend nhất thời mà AI có thể không biết.\n\n"
-        f"TÓM TẮT KỊCH BẢN: '''{context_summary}'''\n\n"
-        "Ví dụ phong cách caption (không phải nội dung): 'Không thể tin được chuyện gì đã xảy ra 😱 Xem ngay để biết! #shock #batngo', 'Bạn nghĩ sao về điều này? 🤔 Comment ngay! #learnontiktok #xuhuong'\n"
-        "Chỉ cung cấp nội dung mô tả (caption) và các hashtag đề xuất."
-    )
+
+    base_description_prompt_template = load_prompt("engaging_description_prompt.txt")
+    if not base_description_prompt_template:
+        print("LỖI: Không thể tải mẫu prompt mô tả. Bỏ qua tạo mô tả.")
+        return "", 0, 0
+        
+    prompt = base_description_prompt_template.format(context_summary=context_summary)
+
     try:
         response = client.chat.completions.create(
             model=model, messages=[{"role": "system", "content": "Chuyên gia viết caption TikTok tiếng Việt siêu thu hút, ngắn gọn, kèm hashtag liên quan."}, {"role": "user", "content": prompt}],
@@ -254,41 +258,50 @@ def generate_engaging_description_for_rewrite(context_summary: str, model: str) 
     except Exception as e:
         print(f"Lỗi tạo mô tả (viết lại, TikTok): {e}"); return "", 0, 0
 
-def generate_new_narrative_segments(context_summary: str, original_srt_full_text: str, target_duration_seconds: float, model: str, narrative_goal_prompt_template: str) -> tuple[list[str], int, int]:
-    """Generates new narrative segments based on summary, full original text, target duration, and a goal prompt template."""
+def generate_new_narrative_segments(context_summary: str, original_srt_full_text: str, target_duration_seconds: float, model: str, narrative_goal_prompt_template: str) -> tuple[list[str] | list[dict], int, int]:
+    """
+    Generates new narrative segments based on summary, full original text, target duration, 
+    and a goal prompt template.
+    For themed narrative, returns a list of dicts: [{'title': str, 'segments': list[str]}].
+    Otherwise, returns a list of strings.
+    """
     print(f"\nĐang tạo các phân đoạn tự sự mới với model: {model}...")
     
     if not context_summary and not original_srt_full_text:
         print("Lỗi: Cần tóm tắt ngữ cảnh hoặc toàn bộ kịch bản gốc để tạo tự sự mới.")
         return [], 0, 0
 
-    # Construct the dynamic part of the prompt regarding duration
-    duration_guidance = f"Tổng thời lượng của kịch bản gốc là khoảng {target_duration_seconds:.0f} giây. Kịch bản tự sự mới bạn tạo ra nên có tổng thời lượng tương đương hoặc dài hơn một chút. Hãy cân nhắc điều này khi quyết định số lượng và độ dài của các phân đoạn."
-    if target_duration_seconds == 0:
-        duration_guidance = "Không có thông tin thời lượng gốc, hãy tập trung vào việc tạo đủ số lượng phân đoạn để bao phủ nội dung một cách hợp lý."
+    # The prompt template is now expected to be fully formatted by the caller for themed narrative.
+    # For old style, it might still use duration_guidance. This function becomes more of a wrapper.
+    # The narrative_goal_prompt_template passed in IS the full_prompt's main body.
+
+    # The main template is loaded, and placeholders for summary/original_text are appended later.
+    # The {story_completeness_guidance} is part of narrative_goal_prompt_template itself loaded from file.
+    narrative_goal_prompt_body = narrative_goal_prompt_template # This is already the formatted string passed in.
 
     full_prompt = (
-        f"{narrative_goal_prompt_template.format(duration_guidance=duration_guidance)}\n\n"
+        f"{narrative_goal_prompt_body}\n\n" 
         "TÓM TẮT KỊCH BẢN ĐỂ THAM KHẢO (cho bối cảnh và giọng điệu tổng thể):\n"
-        f"'''{context_summary}'''\n\n"
+        f"'''{context_summary}'''\\n\\n"
         "KỊCH BẢN GỐC ĐẦY ĐỦ (để đảm bảo bám sát các sự kiện và thông tin chi tiết):\n"
-        f"'''{original_srt_full_text}'''\n\n"
-        "LƯU Ý QUAN TRỌNG: Chỉ trả về các đoạn văn bản, mỗi đoạn cách nhau bởi dấu phân tách '||NEW_SEGMENT||'. Không thêm bất kỳ giải thích, tiêu đề, hay định dạng nào khác."
+        f"'''{original_srt_full_text}'''"
+        "Toàn bộ câu chuyện và tiêu đề các chủ đề cần được tối ưu để thu hút người nghe và thân thiện với SEO."
     )
 
     prompt_tokens = 0
     completion_tokens = 0
-    segments = []
+    # segments = [] # Old return type
+    parsed_output = [] # Can be list of strings or list of dicts
 
     try:
         response = client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "Bạn là một nhà văn sáng tạo, chuyên gia xây dựng kịch bản tự sự hấp dẫn bằng tiếng Việt. Nhiệm vụ của bạn là tạo ra các đoạn văn bản tường thuật dựa trên tóm tắt và hướng dẫn được cung cấp. Luôn trả lời bằng các đoạn văn bản phân tách bởi '||NEW_SEGMENT||'."},
+                {"role": "system", "content": "Bạn là một nhà văn sáng tạo, chuyên gia xây dựng kịch bản tự sự hấp dẫn bằng tiếng Việt. Nhiệm vụ của bạn là tạo ra các đoạn văn bản tường thuật dựa trên tóm tắt và hướng dẫn được cung cấp. Hãy tuân thủ định dạng đầu ra được yêu cầu trong hướng dẫn."},
                 {"role": "user", "content": full_prompt}
             ],
-            temperature=0.75, # Slightly higher for more creativity
-            max_tokens=3000  # Allow for a decent length narrative
+            temperature=0.75, 
+            max_tokens=3800  # Increased slightly for potentially longer themed output
         )
 
         if response.usage:
@@ -297,22 +310,57 @@ def generate_new_narrative_segments(context_summary: str, original_srt_full_text
         
         raw_response_content = response.choices[0].message.content
         if raw_response_content:
-            segments = [seg.strip() for seg in raw_response_content.split("||NEW_SEGMENT||") if seg.strip()]
-            if not segments:
+            # Try parsing for new themed format first
+            if "||NEW_THEME_TITLE||" in raw_response_content and "||END_THEME||" in raw_response_content:
+                themed_data = []
+                theme_blocks = raw_response_content.split("||END_THEME||")
+                for block in theme_blocks:
+                    block = block.strip()
+                    if not block.startswith("||NEW_THEME_TITLE||"):
+                        continue
+                    
+                    parts = block.split("\n", 1) # CORRECTED: Split title line from content by newline
+                    title_line = parts[0].replace("||NEW_THEME_TITLE||", "").strip()
+                    
+                    theme_segments_str = parts[1] if len(parts) > 1 else ""
+                    segments_in_theme = [s.strip() for s in theme_segments_str.split("||NEW_SEGMENT||") if s.strip()]
+                    
+                    if title_line and segments_in_theme:
+                        themed_data.append({"title": title_line, "segments": segments_in_theme})
+                
+                if themed_data:
+                    parsed_output = themed_data
+                    print(f"Đã tạo và phân tích được {len(themed_data)} chủ đề tự sự.")
+                else:
+                    print(f"Cảnh báo: Phát hiện các dấu hiệu định dạng chủ đề nhưng không phân tích được chủ đề nào. Nội dung thô: {raw_response_content[:300]}...")
+                    # Fallback to old parsing if themed parsing fails but markers were present
+                    parsed_output = [seg.strip() for seg in raw_response_content.split("||NEW_SEGMENT||") if seg.strip()]
+                    if parsed_output:
+                         print(f"Cảnh báo: Phân tích theo chủ đề thất bại, quay lại phân tích theo phân đoạn đơn lẻ: tìm thấy {len(parsed_output)} phân đoạn.")
+                    else:
+                        print(f"Lỗi: API trả về nội dung nhưng không tìm thấy phân đoạn hợp lệ sau khi tách bằng '||NEW_SEGMENT||' (thất bại cả themed parse). Nội dung thô: {raw_response_content[:300]}...")
+
+            else: # Fallback to old segment parsing if no theme markers
+                parsed_output = [seg.strip() for seg in raw_response_content.split("||NEW_SEGMENT||") if seg.strip()]
+                if not parsed_output:
                  print(f"Cảnh báo: API trả về nội dung nhưng không tìm thấy phân đoạn hợp lệ sau khi tách bằng '||NEW_SEGMENT||'. Nội dung thô: {raw_response_content[:200]}...")
         else:
             print("Lỗi: API trả về nội dung trống cho việc tạo tự sự mới.")
 
     except Exception as e:
         print(f"Lỗi khi tạo phân đoạn tự sự mới: {e}")
-        # segments will remain empty
+        # parsed_output will remain empty
 
-    if segments:
-        print(f"Đã tạo được {len(segments)} phân đoạn tự sự mới.")
+    if parsed_output:
+        if isinstance(parsed_output, list) and parsed_output and isinstance(parsed_output[0], dict):
+             print(f"Đã tạo được {len(parsed_output)} chủ đề tự sự mới.")
+        elif isinstance(parsed_output, list) and parsed_output : # list of strings
+            print(f"Đã tạo được {len(parsed_output)} phân đoạn tự sự mới (kiểu cũ).")
+        # else it's empty, handled by the 'else' below
     else:
-        print("Không tạo được phân đoạn tự sự nào.")
+        print("Không tạo được phân đoạn/chủ đề tự sự nào.")
         
-    return segments, prompt_tokens, completion_tokens
+    return parsed_output, prompt_tokens, completion_tokens
 
 def rewrite_single_block_content(original_text: str, model: str, rewrite_instruction: str) -> tuple[str, int, int]:
     """
@@ -329,7 +377,7 @@ def rewrite_single_block_content(original_text: str, model: str, rewrite_instruc
     )
     
     user_prompt = (
-        f"{rewrite_instruction}\n\n"
+        f"{rewrite_instruction}\\n\\n"
         "Văn bản gốc:\n"
         f"'''{original_text}'''\n\n"
         "Chỉ trả về phần văn bản đã được viết lại, không thêm bất kỳ lời giải thích hay bình luận nào khác."
@@ -392,7 +440,7 @@ def rewrite_batch_content(original_texts_in_batch: list[tuple[str, str]], model:
     )
 
     user_prompt = (
-        f"{rewrite_instruction}\n\n"
+        f"{rewrite_instruction}\\n\\n"
         "Hãy viết lại các đoạn văn bản được đánh số ID dưới đây. "
         "Tham khảo TÓM TẮT KỊCH BẢN sau để hiểu rõ hơn về bối cảnh:\n\n"
         f"TÓM TẮT KỊCH BẢN:\n'''{context_summary}'''\n\n"
@@ -479,7 +527,8 @@ def rewrite_srt_script_main(
     description_model: str, # New parameter
     summary_file_path: str,
     rewrite_mode: str,
-    block_rewrite_style: str # "formal" or "creative_text"
+    block_rewrite_style: str, # "formal" or "creative_text"
+    narrative_persona: str | None = None # New parameter for persona
 ):
     """Main function to rewrite/regenerate an SRT file's content based on the selected mode."""
     srt_blocks_full = load_srt_blocks(input_path)
@@ -620,78 +669,73 @@ def rewrite_srt_script_main(
             print("Không có tóm tắt, không thể tạo tự sự mới. Kết thúc.")
             return # Already checked, but as a safeguard
 
-        actual_output_filename = f"{original_base_name}_narrative_regen_{run_identifier}.srt"
+        actual_output_filename = f"{original_base_name}_themed_narrative_{run_identifier}.txt" # Changed to .txt
         actual_output_path = os.path.join(output_directory, actual_output_filename)
         
         print(f"Sử dụng model tạo tự sự: {model}")
-        narrative_goal_prompt_template = (
-            "Bạn LÀ Bà Diệu An, một người kể chuyện lớn tuổi, đức độ và am hiểu sự đời. Hãy hoàn toàn nhập vai Bà Diệu An. "
-            "QUAN TRỌNG VỀ XƯNG HÔ: Khi kể chuyện, hãy LUÔN LUÔN xưng là 'bà' (ví dụ: 'bà kể cho các con nghe', 'ngày đó bà còn trẻ...') và gọi người nghe (khán giả) là 'các con' (ví dụ: 'các con có biết không?', 'chuyện là thế này nè các con...'). "
-            "Hãy kể lại câu chuyện này như thể chính bà đang thủ thỉ, tâm tình, chia sẻ những ký ức sâu sắc của mình trực tiếp với các con. Lời kể của bà phải thật tự nhiên, chân thành, thể hiện đúng vai vế và tình cảm của một người bà với các con cháu. Lời kể của bà chính là lời của Bà Diệu An, không phải là một sự tường thuật lại từ một người thứ ba hay một diễn viên đóng vai. "
-            
-            "LƯU Ý ĐẶC BIỆT VỀ NHÂN VẬT TRONG KỊCH BẢN GỐC: Trong kịch bản gốc, nếu có nhắc đến tên 'Diệu Huyền', các con hãy hiểu rằng đó chính là bà (Bà Diệu An) khi còn trẻ hoặc trong một bối cảnh khác của câu chuyện. Khi kể lại, bà sẽ luôn xưng là 'bà' khi nói về mình trong vai Diệu Huyền/Bà Diệu An, và kể từ góc nhìn của bà, như đang kể cho các con nghe về quá khứ của mình. "
-            
-            "Kịch bản tự sự mới này phải bám sát chặt chẽ các sự kiện, thông tin và trình tự của KỊCH BẢN GỐC ĐẦY ĐỦ. "
-            "Sử dụng TÓM TẮT KỊCH BẢN để nắm bắt giọng điệu và bối cảnh chung, nhưng toàn bộ lời kể và cách xưng hô phải là của Bà Diệu An nói với các con. "
-            "{duration_guidance} " 
-            "Chia kịch bản thành nhiều đoạn văn ngắn (khoảng 2-4 câu mỗi đoạn), mỗi đoạn văn sẽ tương ứng với một khối phụ đề. Lời văn cần tự nhiên, mang đậm tính kể chuyện của Bà Diệu An (xưng 'bà', gọi 'các con'), có thể có những lời bình luận ý nhị hoặc chiêm nghiệm của chính bà. Khi mô tả các nhân vật khác hoặc đưa ra những lời bình/chiêm nghiệm này, hãy đảm bảo giọng điệu, cách nhìn, và ngôn từ phải hoàn toàn là của Bà Diệu An – một người phụ nữ lớn tuổi, từng trải, am hiểu sự đời, đang kể chuyện cho các con nghe. Toàn bộ lời kể, bao gồm cả việc mô tả nhân vật và sự kiện, đều phải nhất quán với vai kể này. "
-            "Tập trung vào việc kể một câu chuyện mạch lạc, thu hút sự chú ý của các con, có thể bao gồm các yếu tố bất ngờ hoặc cảm xúc, nhưng không được thay đổi các sự thật cốt lõi từ kịch bản gốc (ngoại trừ việc thống nhất tên gọi và cách xưng hô như đã nêu trên). "
-            "Mục tiêu là tạo ra một trải nghiệm xem mới mẻ, với giọng kể đặc trưng, thân mật và trực tiếp của Bà Diệu An (bà xưng 'bà', gọi 'các con'), có thể dùng cho hình ảnh gốc hoặc gợi ý hình ảnh mới, đồng thời vẫn truyền tải trung thực nội dung gốc. "
-            "Vui lòng trả về một danh sách các đoạn văn bản (phân tách bằng một dấu xuống dòng đặc biệt như '||NEW_SEGMENT||' giữa các đoạn) mà không có bất kỳ định dạng JSON hay đánh số nào."
-        )
-        
-        original_srt_full_text = "\n\n".join(srt_blocks_full) 
-        original_duration_seconds = get_srt_total_duration(srt_blocks_full)
-        print(f"Tổng thời lượng kịch bản gốc ước tính: {original_duration_seconds:.2f} giây.")
+        if narrative_persona:
+            print(f"Sử dụng persona kể chuyện: {narrative_persona}")
 
-        print("Đang tạo tự sự mới...")
-        segments, nr_p_tokens, nr_c_tokens = generate_new_narrative_segments(
+        story_completeness_guidance = (
+            "Câu chuyện kể lại cần bao quát đầy đủ nội dung chính của kịch bản gốc. "
+            "Hãy chia câu chuyện thành ít nhất 3 chủ đề (và có thể nhiều hơn nếu nội dung gốc phong phú và cho phép) để truyền tải toàn bộ diễn biến một cách mạch lạc và hấp dẫn, với mỗi chủ đề có thể được phát triển thành một video riêng biệt. "
+            "Toàn bộ câu chuyện và tiêu đề các chủ đề cần được tối ưu để thu hút người nghe và thân thiện với SEO."
+        )
+
+        # Load the base narrative prompt from the persona-specific file
+        base_narrative_prompt_template = ""
+        if narrative_persona:
+            base_narrative_prompt_template = load_prompt("narrative_regeneration_prompt.txt", persona_name=narrative_persona)
+        
+        if not base_narrative_prompt_template:
+            print(f"LỖI: Không thể tải mẫu prompt tạo tự sự cho persona '{narrative_persona if narrative_persona else 'default'}'. Bỏ qua tạo tự sự.")
+            # Log cost even if prompt loading fails, as summary might have incurred cost
+            print(f"Tổng số prompt tokens (bao gồm tóm tắt): {grand_total_prompt_tokens}")
+            print(f"Tổng số completion tokens (bao gồm tóm tắt): {grand_total_completion_tokens}")
+            print(f"Tổng ước tính chi phí cho phiên làm việc (chỉ tóm tắt): ${total_estimated_cost:.6f}")
+            return
+
+        narrative_goal_prompt_template = base_narrative_prompt_template # This now comes from the file
+
+        original_srt_full_text = "\n\n".join(srt_blocks_full) 
+        
+        print("Đang tạo tự sự mới theo chủ đề...")
+        
+        themed_narratives, nr_p_tokens, nr_c_tokens = generate_new_narrative_segments(
             context_summary if context_summary else "", 
             original_srt_full_text,
-            original_duration_seconds,
+            0, 
             model, 
-            narrative_goal_prompt_template
+            narrative_goal_prompt_template.replace("{story_completeness_guidance}", story_completeness_guidance)
         )
 
-        if segments:
-            generated_srt_content = []
-            start_time_ms = 0
+        grand_total_prompt_tokens += nr_p_tokens
+        grand_total_completion_tokens += nr_c_tokens
+        narrative_api_call_cost = calculate_cost(nr_p_tokens, nr_c_tokens, model)
+        print(f"Chi phí API cho việc cố gắng tạo tự sự (model: {model}): ${narrative_api_call_cost:.6f}")
+        total_estimated_cost += narrative_api_call_cost
+
+        if themed_narratives and isinstance(themed_narratives, list) and len(themed_narratives) > 0 and isinstance(themed_narratives[0], dict):
+            full_text_output = ""
+            for theme_data in tqdm(themed_narratives, desc="Đang định dạng các chủ đề", unit="chủ đề"):
+                full_text_output += f"{theme_data.get('title', 'KHÔNG CÓ TIÊU ĐỀ')}\n"
+                for segment_text in theme_data.get('segments', []):
+                    full_text_output += f"{segment_text}\n"
+                full_text_output += "\n" # Blank line after each theme's segments
             
-            # Distribute original duration among segments
-            num_segments = len(segments)
-            if num_segments > 0 and original_duration_seconds > 0:
-                avg_duration_per_segment_ms = (original_duration_seconds * 1000) / num_segments
+            if full_text_output.strip(): # Ensure there's actual content to save
+                try:
+                    os.makedirs(os.path.dirname(actual_output_path), exist_ok=True)
+                    with open(actual_output_path, "w", encoding="utf-8") as f:
+                        f.write(full_text_output.strip())
+                    print(f"Kịch bản tự sự theo chủ đề đã được lưu tại: {actual_output_path}")
+                except Exception as e:
+                    print(f"Lỗi khi lưu file văn bản tự sự {actual_output_path}: {e}")
             else:
-                avg_duration_per_segment_ms = NARRATIVE_SEGMENT_DURATION_SECONDS * 1000 # Fallback
-            
-            # Ensure minimum duration to avoid overly short segments if original is very short or many segments generated
-            min_segment_duration_ms = 3000 # 3 seconds minimum
-            segment_duration_ms = max(avg_duration_per_segment_ms, min_segment_duration_ms)
-
-            print(f"Sẽ tạo {num_segments} khối phụ đề mới, mỗi khối khoảng {segment_duration_ms/1000:.2f} giây.")
-            for i, seg_text in enumerate(tqdm(segments, desc="Đang tạo các khối SRT từ tự sự mới", unit="khối")):
-                end_time_ms = start_time_ms + segment_duration_ms
-                
-                # Ensure ms components are integers for formatting
-                current_start_ms_int = int(start_time_ms % 1000)
-                current_end_ms_int = int(end_time_ms % 1000)
-
-                start_hms = time.strftime('%H:%M:%S', time.gmtime(start_time_ms // 1000))
-                end_hms = time.strftime('%H:%M:%S', time.gmtime(end_time_ms // 1000))
-                
-                timecode = f"{start_hms},{current_start_ms_int:03d} --> {end_hms},{current_end_ms_int:03d}"
-                generated_srt_content.append(f"{i+1}\n{timecode}\n{seg_text}")
-                start_time_ms = end_time_ms + 200 # Small gap between subtitles
-            save_results_to_file(actual_output_path, generated_srt_content)
-            print(f"Kịch bản tự sự mới (với thời gian tự động cơ bản) đã được lưu tại: {actual_output_path}")
-
-            grand_total_prompt_tokens += nr_p_tokens
-            grand_total_completion_tokens += nr_c_tokens
-            narrative_regen_cost = calculate_cost(nr_p_tokens, nr_c_tokens, model)
-            print(f"Chi phí tạo tự sự mới (model: {model}): ${narrative_regen_cost:.6f}")
-            total_estimated_cost += narrative_regen_cost
+                print("Nội dung tự sự theo chủ đề được tạo ra trống sau khi định dạng. Sẽ không lưu file.")
         else:
-            print("Không tạo được phân đoạn tự sự mới.")
+            print("Không tạo được nội dung tự sự theo chủ đề như mong muốn (hoặc định dạng không đúng). File sẽ không được lưu.")
+            # Cost of API call is already accounted for. No file is saved.
 
     else:
         print(f"LỖI: Chế độ viết lại '{rewrite_mode}' không hợp lệ.")
@@ -714,35 +758,37 @@ if __name__ == "__main__":
     SRT_BATCH_SIZE = DEFAULT_BATCH_SIZE # Only for block_by_block_rewrite mode
     
     # --- CHOOSE OPERATIONAL MODE ---
-    REWRITE_MODE = "block_by_block_rewrite"  # Options: "narrative_regeneration", "block_by_block_rewrite"
+    REWRITE_MODE = "narrative_regeneration"  # Options: "narrative_regeneration", "block_by_block_rewrite"
     # -------------------------------
+
+    # --- CHOOSE NARRATIVE PERSONA (Only for REWRITE_MODE = "narrative_regeneration") ---
+    NARRATIVE_PERSONA = "BaDieuAn" # Set to None or other persona name as needed
+    # ------------------------------------------------------------------------------------
 
     # --- CHOOSE REWRITE STYLE (Only for REWRITE_MODE = "block_by_block_rewrite") ---
     BLOCK_REWRITE_STYLE = "creative_text" # Options: "formal", "creative_text"
     # ----------------------------------------------------------------------------
 
-    REWRITE_INSTRUCTION_FORMAL = (
-        "Hãy viết lại đoạn văn bản sau đây với văn phong trang trọng hơn, "
-        "thích hợp cho một giọng đọc phim tài liệu. Giữ nguyên ý nghĩa cốt lõi của văn bản. "
-        "Không thay đổi tên riêng hoặc các thuật ngữ kỹ thuật trừ khi được yêu cầu."
-    )
+    # Load block rewrite prompts from files
+    REWRITE_INSTRUCTION_FORMAL = load_prompt("block_rewrite_formal_prompt.txt")
+    REWRITE_INSTRUCTION_CREATIVE_TEXT = load_prompt("block_rewrite_creative_text_prompt.txt")
 
-    REWRITE_INSTRUCTION_CREATIVE_TEXT = (
-        "Hãy viết lại đoạn văn bản sau đây để trở nên hấp dẫn, thu hút sự tò mò của khán giả đại chúng. "
-        "Bạn có thể sử dụng các kỹ thuật kể chuyện, thêm yếu tố gây cấn, hoặc đơn giản hóa các ý tưởng phức tạp để nội dung dễ tiếp cận và dễ lan tỏa hơn. "
-        "Mục tiêu là tối đa hóa sự duy trì và hứng thú của người xem, ngay cả khi điều đó có nghĩa là thay đổi một chút cách diễn đạt trực tiếp của kịch bản gốc, nhưng vẫn phải giữ được các sự kiện hoặc thông tin cốt lõi. "
-        "Tham khảo tóm tắt ngữ cảnh để đảm bảo sự sáng tạo phù hợp với bức tranh toàn cảnh của câu chuyện."
-    )
-
-    SELECTED_BLOCK_REWRITE_INSTRUCTION = ""
+    SELECTED_BLOCK_REWRITE_INSTRUCTION = "" # Default to empty if loading fails
     output_filename_suffix_placeholder = "placeholder" # This will be refined by the main function
 
     if BLOCK_REWRITE_STYLE == "formal":
-        SELECTED_BLOCK_REWRITE_INSTRUCTION = REWRITE_INSTRUCTION_FORMAL
+        if REWRITE_INSTRUCTION_FORMAL: # Check if prompt loaded successfully
+            SELECTED_BLOCK_REWRITE_INSTRUCTION = REWRITE_INSTRUCTION_FORMAL
+        else:
+            print("LỖI: Không thể tải prompt viết lại formal. Sẽ sử dụng hướng dẫn trống.")
     elif BLOCK_REWRITE_STYLE == "creative_text":
-        SELECTED_BLOCK_REWRITE_INSTRUCTION = REWRITE_INSTRUCTION_CREATIVE_TEXT
-    # No exit here if style is wrong, main function can use default or handle if mode is block_by_block
-
+        if REWRITE_INSTRUCTION_CREATIVE_TEXT: # Check if prompt loaded successfully
+            SELECTED_BLOCK_REWRITE_INSTRUCTION = REWRITE_INSTRUCTION_CREATIVE_TEXT
+        else:
+            print("LỖI: Không thể tải prompt viết lại creative. Sẽ sử dụng hướng dẫn trống.")
+    else:
+        print(f"CẢNH BÁO: Kiểu viết lại khối '{BLOCK_REWRITE_STYLE}' không hợp lệ. Hướng dẫn viết lại có thể trống.")
+    
     # Generate a timestamp string for filenames
     timestamp_str = time.strftime("%Y%m%d_%H%M%S")
 
@@ -772,5 +818,6 @@ if __name__ == "__main__":
         description_model=TITLE_DESCRIPTION_MODEL_NAME, # Pass description model
         summary_file_path=summary_file_path,
         rewrite_mode=REWRITE_MODE,
-        block_rewrite_style=BLOCK_REWRITE_STYLE
+        block_rewrite_style=BLOCK_REWRITE_STYLE,
+        narrative_persona=NARRATIVE_PERSONA # Pass the persona
     ) 
